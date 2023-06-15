@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.repository.query.Param;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.codec.multipart.FilePart;
 import org.springframework.web.bind.annotation.*;
@@ -26,6 +27,27 @@ public class ProductoController {
 
     @Value("{$config.uploads.path}")
     private String path;
+
+    @PostMapping("/confoto")
+    public Mono<ResponseEntity<Producto>> crearConFoto(Producto producto, @RequestPart FilePart file){
+
+        if(producto.getCreateAt()==null) {
+            producto.setCreateAt(new Date());
+        }
+
+        producto.setFoto(UUID.randomUUID().toString() + "-" + file.filename()
+                .replace(" ", "")
+                .replace(":", "")
+                .replace("\\", ""));
+
+        return file.transferTo(new File(path + producto.getFoto())).then(productoService.save(producto))
+                .map(p-> ResponseEntity
+                        .created(URI.create("/api/productos/".concat(p.getId())))
+                        .contentType(MediaType.APPLICATION_JSON_UTF8)
+                        .body(p)
+                );
+
+    }
 
     @PostMapping("/upload/{id}")
     public Mono<ResponseEntity<Producto>> upload(@PathVariable String id, @RequestPart FilePart file){

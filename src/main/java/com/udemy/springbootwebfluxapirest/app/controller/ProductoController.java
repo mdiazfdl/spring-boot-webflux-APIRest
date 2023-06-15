@@ -3,15 +3,19 @@ package com.udemy.springbootwebfluxapirest.app.controller;
 import com.udemy.springbootwebfluxapirest.app.model.Producto;
 import com.udemy.springbootwebfluxapirest.app.service.ProductoService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.repository.query.Param;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.codec.multipart.FilePart;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.io.File;
 import java.net.URI;
 import java.util.Date;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("api/producto")
@@ -19,6 +23,22 @@ public class ProductoController {
 
     @Autowired
     private ProductoService productoService;
+
+    @Value("{$config.uploads.path}")
+    private String path;
+
+    @PostMapping("/upload/{id}")
+    public Mono<ResponseEntity<Producto>> upload(@PathVariable String id, @RequestPart FilePart file){
+        return productoService.findById(id).flatMap(p -> {
+                    p.setFoto(UUID.randomUUID().toString() + "-" + file.filename()
+                            .replace(" ", "")
+                            .replace(":", "")
+                            .replace("\\", ""));
+
+                    return file.transferTo(new File(path + p.getFoto())).then(productoService.save(p));
+                }).map(p -> ResponseEntity.ok(p))
+                .defaultIfEmpty(ResponseEntity.notFound().build());
+    }
 
     @GetMapping
     public Mono<ResponseEntity<Flux<Producto>>> listar() {
